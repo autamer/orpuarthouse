@@ -175,8 +175,11 @@ function GalleryCard({ item, localIndex, onOpen }: { item: GalleryItem; globalIn
 
 function CoverflowCarousel({ items, groupStartIndex, onOpen }: { items: GalleryItem[]; groupStartIndex: number; onOpen: (i: number) => void }) {
   const [active, setActive] = useState(0);
+  const [dragOffset, setDragOffset] = useState(0); // live px delta during drag
+  const [isDragging, setIsDragging] = useState(false);
   const touchStartX = useRef<number | null>(null);
-  const dragDelta = useRef(0);
+
+  const CARD_WIDTH_VW = 52; // vw — matches card width below
 
   const goTo = useCallback((index: number) => {
     setActive(Math.max(0, Math.min(items.length - 1, index)));
@@ -184,21 +187,29 @@ function CoverflowCarousel({ items, groupStartIndex, onOpen }: { items: GalleryI
 
   const onTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
-    dragDelta.current = 0;
+    setDragOffset(0);
+    setIsDragging(true);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
     if (touchStartX.current === null) return;
-    dragDelta.current = e.touches[0].clientX - touchStartX.current;
+    const delta = e.touches[0].clientX - touchStartX.current;
+    // apply rubber-band resistance at the edges
+    const atEdge = (active === 0 && delta > 0) || (active === items.length - 1 && delta < 0);
+    setDragOffset(atEdge ? delta * 0.25 : delta);
   };
 
   const onTouchEnd = () => {
-    if (Math.abs(dragDelta.current) > 40) {
-      goTo(dragDelta.current < 0 ? active + 1 : active - 1);
+    if (Math.abs(dragOffset) > 40) {
+      goTo(dragOffset < 0 ? active + 1 : active - 1);
     }
+    setDragOffset(0);
+    setIsDragging(false);
     touchStartX.current = null;
-    dragDelta.current = 0;
   };
+
+  // convert live px drag to a fractional card offset (0–1) for interpolating transforms
+  const dragProgress = dragOffset / (window?.innerWidth * CARD_WIDTH_VW / 100 || 1);
 
   return (
     <div
@@ -214,25 +225,34 @@ function CoverflowCarousel({ items, groupStartIndex, onOpen }: { items: GalleryI
         // only render cards within 2 slots of active for perf
         if (absOffset > 2) return null;
 
-        const rotateY = offset * 38;
-        const translateX = offset * 52; // % of card width
-        const scale = absOffset === 0 ? 1 : absOffset === 1 ? 0.78 : 0.58;
+        // blend the discrete offset with live drag progress
+        const liveOffset = offset - dragProgress;
+        const liveAbs = Math.abs(liveOffset);
+
+        const rotateY = liveOffset * 38;
+        const translateX = liveOffset * 52;
+        const scale = Math.max(0.55, 1 - liveAbs * 0.18);
         const zIndex = 10 - absOffset;
-        const opacity = absOffset > 1 ? 0.4 : 1;
-        const brightness = absOffset === 0 ? 1 : absOffset === 1 ? 0.65 : 0.4;
+        const opacity = liveAbs > 1.8 ? 0.4 : 1;
+        const brightness = Math.max(0.35, 1 - liveAbs * 0.32);
+
+        // during drag: no transition so it follows finger instantly
+        const transition = isDragging
+          ? "none"
+          : "transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.35s ease, filter 0.35s ease";
 
         return (
           <div
             key={item.src}
             onClick={() => {
-              if (absOffset === 0) onOpen(groupStartIndex + i);
-              else goTo(i);
+              if (absOffset === 0 && Math.abs(dragOffset) < 5) onOpen(groupStartIndex + i);
+              else if (!isDragging) goTo(i);
             }}
             style={{
               position: "absolute",
               top: "50%",
               left: "50%",
-              width: "52vw",
+              width: `${CARD_WIDTH_VW}vw`,
               aspectRatio: "3/4",
               borderRadius: "4px",
               overflow: "hidden",
@@ -240,7 +260,7 @@ function CoverflowCarousel({ items, groupStartIndex, onOpen }: { items: GalleryI
               zIndex,
               opacity,
               transform: `translate(-50%, -50%) translateX(${translateX}%) rotateY(${rotateY}deg) scale(${scale})`,
-              transition: "transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.35s ease",
+              transition,
               transformStyle: "preserve-3d",
               filter: `brightness(${brightness})`,
               willChange: "transform",
