@@ -322,7 +322,9 @@ export default function Gallery() {
                 </h3>
               </div>
 
+              {/* Desktop: grid */}
               <div
+                className="gallery-grid"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
@@ -342,6 +344,57 @@ export default function Gallery() {
                   );
                 })}
               </div>
+
+              {/* Mobile: horizontal swipe carousel */}
+              <div
+                className="gallery-carousel"
+                style={{
+                  display: "none",
+                  overflowX: "auto",
+                  WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"],
+                  scrollSnapType: "x mandatory",
+                  gap: "0.625rem",
+                  paddingBottom: "0.5rem",
+                  scrollbarWidth: "none",
+                  msOverflowStyle: "none",
+                } as React.CSSProperties}
+              >
+                {group.items.map((item, localIndex) => {
+                  const globalIndex = groupStartIndex + localIndex;
+                  return (
+                    <div
+                      key={item.src}
+                      style={{
+                        flex: "0 0 72vw",
+                        scrollSnapAlign: "start",
+                        aspectRatio: "3/4",
+                        position: "relative",
+                        borderRadius: "2px",
+                        overflow: "hidden",
+                        background: "var(--color-surface)",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => setLightboxIndex(globalIndex)}
+                    >
+                      <Image
+                        src={item.src}
+                        alt={item.alt}
+                        fill
+                        sizes="72vw"
+                        style={{ objectFit: "cover" }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              <style>{`
+                @media (max-width: 639px) {
+                  .gallery-grid { display: none !important; }
+                  .gallery-carousel { display: flex !important; }
+                  .gallery-carousel::-webkit-scrollbar { display: none; }
+                }
+              `}</style>
             </div>
           );
         })}
