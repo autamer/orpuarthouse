@@ -209,7 +209,8 @@ function CoverflowCarousel({ items, groupStartIndex, onOpen }: { items: GalleryI
   };
 
   // convert live px drag to a fractional card offset (0–1) for interpolating transforms
-  const dragProgress = dragOffset / (window?.innerWidth * CARD_WIDTH_VW / 100 || 1);
+  // ~52vw card on a ~390px phone ≈ 200px — good sensitivity constant, no window access needed
+  const dragProgress = dragOffset / 200;
 
   return (
     <div
